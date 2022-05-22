@@ -7,7 +7,15 @@
         <p>
         <ul>
             {{range .Site.RegularPages }}
-            <li><a href=" {{.Permalink}}">{{.Title}}</a></li>
+            <li><a href=" {{.Permalink}}">{{.Title}}</a> - {{ .PublishDate.Format "January 2, 2006" }}</li>
+            <div class="is-post-content">
+                {{ .Summary }}
+            </div>
+            {{ if .Truncated }}
+            <div>
+                <a href="{{ .RelPermalink }}">Read More…</a>
+            </div>
+            {{end}}
             {{end}}
         </ul>
         </p>
