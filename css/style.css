@@ -156,7 +156,8 @@ hr {
 
 code {
     background-color: #191a1e;
-    color: #2bc258
+    color: #2bc258;
+    white-space: pre-wrap !important;
 }
 
 code:hover {
