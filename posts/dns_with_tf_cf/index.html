@@ -1,0 +1,190 @@
+<!doctype html><html><link rel=stylesheet href=https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css><link rel=stylesheet href=https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css><link rel=stylesheet href=/css/style.css><link rel=stylesheet href=/css/syntax.css><meta name=viewport content="width=device-width,initial-scale=1"><title>beau</title><body><div id=content><div class="column is-two-thirds-desktop is-full-tablet is-full-mobile is-family-monospace"><div class="tile is-ancestor"><div class="tile is-parent"><article class="tile is-child notification is-primary"><div class=has-text-centered><div class="is-profile-image mb-5"><figure class="image is-128x128 is-inline-block"><a href=/><img class=is-profile-image src=/images/profile.jpeg alt="avatar of my cat chilling"></a></figure></div></div><p class=title>Beau</p><p class=subtitle>Systems Engineer</p><div class="content has-text-black"><p>internet of beau.</p></div><div id=icons class=has-text-centered><p><span class=icon-text><span class=icon><a href=https://github.com/beauso title="beauso Github"><i class="fa fa-github"></i></a></span>
+<span></span></span>
+<span class=icon-text><span class=icon><a href=mailto:🧠@beau.so><i class="fa fa-envelope"></i></a></span>
+<span></span></span></p></article></div><div id=content></div><div class="tile is-parent is-8"><article class="tile is-child is-content box"><a href=/>../</a><p class=title>Clean YAML DNS management with TF and Cloudflare</p><p class=subtitle>May 22, 2022</p><div class=is-post-content><p><h2 id=intro---avoiding-bad-patterns>Intro - Avoiding bad patterns</h2><p>There are two uninspiring patterns I&rsquo;ve observed with DNS management via Terraform (be it R53, Cloudflare etc):</p><ul><li><p>Resource blocks for each individual record.</p><ul><li>This is fine if you know you&rsquo;re only really going to have a few records, but it almost always ends up being a short sighted approach (especially with multiple domains), repeating attribute after attribute e.g.:</li></ul></li></ul><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt>1
+</span><span class=lnt>2
+</span><span class=lnt>3
+</span><span class=lnt>4
+</span><span class=lnt>5
+</span><span class=lnt>6
+</span><span class=lnt>7
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-hcl data-lang=hcl><span class=line><span class=cl><span class=k>resource</span> <span class=s2>&#34;aws_route53_record&#34; &#34;example_cname&#34;</span> {
+</span></span><span class=line><span class=cl>    <span class=p>...</span>
+</span></span><span class=line><span class=cl>}
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl><span class=k>resource</span> <span class=s2>&#34;aws_route53_record&#34; &#34;another_example_cname&#34;</span> {
+</span></span><span class=line><span class=cl>    <span class=p>...</span>
+</span></span><span class=line><span class=cl>}
+</span></span></code></pre></td></tr></table></div></div><p>^ <em>Ugly</em>, right? You can imagine this quickly gets out of hand fast&mldr;</p><ul><li>Another option: better, yet still not optimal: a long-ass <code>.tfvars</code> file with a ton of records created by a <code>for_each</code> loop. This tends to be fine for one domain, but quickly is realised to not be a scalable solution.</li></ul><p>Alles klar, DNS bitte in ordnung bringen.</p><p>By following along, you will achieve:</p><ul><li>DNS records separated within individual <code>.yml</code> files by apex domain (<code>mydomain.com</code>).</li><li>Cloudflare zones created automatically from above yml.</li><li>Optionally omit certain fields where not required (e.g. <code>proxied</code>, <code>priority</code>, <code>ttl</code>)</li></ul><h2 id=solution>Solution</h2><h3 id=1-structuring-your-records-as-yml>1. Structuring your records as YML</h3><p>We&rsquo;ll need to structure our records as follows, assuming this is our application where we use the Cloudflare provider:</p><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt>1
+</span><span class=lnt>2
+</span><span class=lnt>3
+</span><span class=lnt>4
+</span><span class=lnt>5
+</span><span class=lnt>6
+</span><span class=lnt>7
+</span><span class=lnt>8
+</span><span class=lnt>9
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-fallback data-lang=fallback><span class=line><span class=cl>├── dns
+</span></span><span class=line><span class=cl>│   ├── mydomain.com
+</span></span><span class=line><span class=cl>│   │   └── dns_definitions.yml
+</span></span><span class=line><span class=cl>│   ├── anotherdomain.com
+</span></span><span class=line><span class=cl>│   │   └── dns_definitions.yml
+</span></span><span class=line><span class=cl>│   └── yetanotherdomain.com
+</span></span><span class=line><span class=cl>│       └── dns_definitions.yml
+</span></span><span class=line><span class=cl>├── locals.tf
+</span></span><span class=line><span class=cl>├── main.tf
+</span></span></code></pre></td></tr></table></div></div><p>Inside each <code>.yml</code> definition file, we should structure it like so:</p><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt> 1
+</span><span class=lnt> 2
+</span><span class=lnt> 3
+</span><span class=lnt> 4
+</span><span class=lnt> 5
+</span><span class=lnt> 6
+</span><span class=lnt> 7
+</span><span class=lnt> 8
+</span><span class=lnt> 9
+</span><span class=lnt>10
+</span><span class=lnt>11
+</span><span class=lnt>12
+</span><span class=lnt>13
+</span><span class=lnt>14
+</span><span class=lnt>15
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-yml data-lang=yml><span class=line><span class=cl><span class=nt>mydomain.com</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>  </span><span class=nt>name</span><span class=p>:</span><span class=w> </span><span class=l>mydomain.com</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>  </span><span class=nt>records</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>    </span><span class=c># CNAMES</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>    </span><span class=nt>examplecname</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>      </span>- <span class=nt>name</span><span class=p>:</span><span class=w> </span><span class=l>examplecname</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>        </span><span class=nt>value</span><span class=p>:</span><span class=w> </span><span class=l>somewherelse.anotherdomain.com</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>        </span><span class=nt>type</span><span class=p>:</span><span class=w> </span><span class=l>CNAME</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>    </span><span class=c># MX</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>    </span><span class=nt>google_mx_record_1</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>      </span>- <span class=nt>name</span><span class=p>:</span><span class=w> </span><span class=l>mydomain.com</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>        </span><span class=nt>value</span><span class=p>:</span><span class=w> </span><span class=l>alt1.aspmx.l.google.com</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>        </span><span class=nt>type</span><span class=p>:</span><span class=w> </span><span class=l>MX</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>        </span><span class=nt>priority</span><span class=p>:</span><span class=w> </span><span class=m>5</span><span class=w>
+</span></span></span></code></pre></td></tr></table></div></div><h3 id=11-merge-with-yamldecode-and-fileset>1.1 <code>merge()</code> with <code>yamldecode()</code> and <code>fileset()</code></h3><p><code>fileset()</code> returns a list of files that match the pattern parameter:</p><ul><li><p>locals.tf: <code>dns_yml_files = fileset(path.module, "dns/*/*.yml")</code></p><ul><li>Debugging the above local (you should use <code>terraform console</code> if you don&rsquo;t already):</li></ul><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt>1
+</span><span class=lnt>2
+</span><span class=lnt>3
+</span><span class=lnt>4
+</span><span class=lnt>5
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-hcl data-lang=hcl><span class=line><span class=cl><span class=k>toset</span><span class=p>([</span>
+</span></span><span class=line><span class=cl>      <span class=s2>&#34;dns/mydomain.com/dns_definitions.yml&#34;</span><span class=p>,</span>
+</span></span><span class=line><span class=cl>      <span class=s2>&#34;dns/anotherdomain.com/dns_definitions.yml&#34;</span><span class=p>,</span>
+</span></span><span class=line><span class=cl>      <span class=s2>&#34;dns/yetanotherdomain.com/dns_definitions.yml&#34;</span><span class=p>,</span>
+</span></span><span class=line><span class=cl>      <span class=p>])</span>
+</span></span></code></pre></td></tr></table></div></div></li></ul><p>Noice. Now we can decode the yaml into a map for each of these files, and merge it into one bad boy local holding all the variables:</p><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt>1
+</span><span class=lnt>2
+</span><span class=lnt>3
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-hcl data-lang=hcl><span class=line><span class=cl><span class=n>  cloudflare_records</span> <span class=o>=</span> <span class=k>merge</span><span class=p>([</span>
+</span></span><span class=line><span class=cl>    <span class=k>for</span> <span class=k>file</span> <span class=k>in</span> <span class=k>local</span><span class=p>.</span><span class=k>dns_yml_files</span> <span class=err>:</span> <span class=k>yamldecode</span><span class=p>(</span><span class=k>file</span><span class=p>(</span><span class=k>file</span><span class=p>))]...</span>
+</span></span><span class=line><span class=cl>  <span class=p>)</span>
+</span></span></code></pre></td></tr></table></div></div><p>Pretty self explanatory, but the expansion notation: <code>...</code> (which you might be familiar with from Go and variadic functions) passes a dynamic number of items (in this case, file paths from our list). It&rsquo;s quite useful to use with <code>merge()</code>.</p><h3 id=13-flatten-cloudflare_records-for-use-in-resource-blocks>1.3 Flatten <code>cloudflare_records</code> for use in resource blocks.</h3><p>We need to flatten the data structure to provide each necessary attribute within <code>resource "cloudflare_record"</code> later (without having it duplicated in each YML record). The original idea for this came from a user called <a href=https://github.com/octopus20/terraform-cloudflare/blob/main/dns_management/main.tf>octopus20</a> (thanks!), and I have improved it to suit some of my requirements I discuss below. The <code>try()</code> wrapped values allow us to forgo them without setting them to <code>null</code> in the records repeating ourselves:</p><p>locals.tf:</p><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt> 1
+</span><span class=lnt> 2
+</span><span class=lnt> 3
+</span><span class=lnt> 4
+</span><span class=lnt> 5
+</span><span class=lnt> 6
+</span><span class=lnt> 7
+</span><span class=lnt> 8
+</span><span class=lnt> 9
+</span><span class=lnt>10
+</span><span class=lnt>11
+</span><span class=lnt>12
+</span><span class=lnt>13
+</span><span class=lnt>14
+</span><span class=lnt>15
+</span><span class=lnt>16
+</span><span class=lnt>17
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-hcl data-lang=hcl><span class=line><span class=cl><span class=n>  flattened_records</span> <span class=o>=</span> <span class=k>flatten</span><span class=p>([</span>
+</span></span><span class=line><span class=cl>    <span class=k>for</span> <span class=k>_</span><span class=p>,</span> <span class=k>zone</span> <span class=k>in</span> <span class=k>local</span><span class=p>.</span><span class=k>cloudflare_records</span> <span class=err>:</span> <span class=p>[</span>
+</span></span><span class=line><span class=cl>      <span class=k>for</span> <span class=k>name</span><span class=p>,</span> <span class=k>entry</span> <span class=k>in</span> <span class=k>zone</span><span class=p>.</span><span class=k>records</span> <span class=err>:</span> <span class=p>[</span>
+</span></span><span class=line><span class=cl>        <span class=k>for</span> <span class=k>record</span> <span class=k>in</span> <span class=k>entry</span> <span class=err>:</span> {
+</span></span><span class=line><span class=cl><span class=n>          friendly_name</span> <span class=o>=</span> <span class=k>name</span>
+</span></span><span class=line><span class=cl><span class=n>          zone_name</span>     <span class=o>=</span> <span class=k>zone</span><span class=p>.</span><span class=k>name</span>
+</span></span><span class=line><span class=cl><span class=n>          name</span>          <span class=o>=</span> <span class=k>record</span><span class=p>.</span><span class=k>name</span>
+</span></span><span class=line><span class=cl><span class=n>          value</span>         <span class=o>=</span> <span class=k>record</span><span class=p>.</span><span class=k>value</span>
+</span></span><span class=line><span class=cl><span class=n>          type</span>          <span class=o>=</span> <span class=k>record</span><span class=p>.</span><span class=k>type</span>
+</span></span><span class=line><span class=cl><span class=n>          ttl</span>           <span class=o>=</span> <span class=k>try</span><span class=p>(</span><span class=k>record</span><span class=p>.</span><span class=k>ttl</span><span class=p>,</span> <span class=k>null</span><span class=p>)</span>
+</span></span><span class=line><span class=cl><span class=n>          proxied</span>       <span class=o>=</span> <span class=k>try</span><span class=p>(</span><span class=k>record</span><span class=p>.</span><span class=k>proxied</span><span class=p>,</span> <span class=k>null</span><span class=p>)</span>
+</span></span><span class=line><span class=cl><span class=n>          priority</span>      <span class=o>=</span> <span class=k>try</span><span class=p>(</span><span class=k>record</span><span class=p>.</span><span class=k>priority</span><span class=p>,</span> <span class=k>null</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>        }
+</span></span><span class=line><span class=cl>      <span class=p>]</span>
+</span></span><span class=line><span class=cl>    <span class=p>]</span>
+</span></span><span class=line><span class=cl>  <span class=k>if</span> <span class=k>contains</span><span class=p>(</span><span class=k>keys</span><span class=p>(</span><span class=k>zone</span><span class=p>),</span> <span class=s2>&#34;records&#34;</span><span class=p>)])</span>
+</span></span><span class=line><span class=cl>}
+</span></span></code></pre></td></tr></table></div></div><p>The conditional is so we can still create zones if no records exist, and not have a circular dependency of needing records for zones and zones for records.</p><p><code>friendly_name</code> is important. While CNAMEs <code>name</code> attributes are all unique: if we use the resource name where a <code>TXT</code> or <code>MX</code> record should exist, there will be duplicate resources in our state file. Therefore we can take advantage of this attribute and give the resource name for our multiple <code>MX</code> record something meaningful in the top key of our yml:</p><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt>1
+</span><span class=lnt>2
+</span><span class=lnt>3
+</span><span class=lnt>4
+</span><span class=lnt>5
+</span><span class=lnt>6
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-yaml data-lang=yaml><span class=line><span class=cl><span class=w>    </span><span class=c># MX</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>    </span><span class=nt>google_mx_record_1</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>      </span>- <span class=nt>name</span><span class=p>:</span><span class=w> </span><span class=l>mydomain.com</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>        </span><span class=nt>value</span><span class=p>:</span><span class=w> </span><span class=l>alt1.aspmx.l.google.com</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>        </span><span class=nt>type</span><span class=p>:</span><span class=w> </span><span class=l>MX</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>        </span><span class=nt>priority</span><span class=p>:</span><span class=w> </span><span class=m>5</span><span class=w>
+</span></span></span></code></pre></td></tr></table></div></div><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt> 1
+</span><span class=lnt> 2
+</span><span class=lnt> 3
+</span><span class=lnt> 4
+</span><span class=lnt> 5
+</span><span class=lnt> 6
+</span><span class=lnt> 7
+</span><span class=lnt> 8
+</span><span class=lnt> 9
+</span><span class=lnt>10
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-hcl data-lang=hcl><span class=line><span class=cl>  {
+</span></span><span class=line><span class=cl><span class=n>    &#34;friendly_name&#34;</span> <span class=o>=</span> <span class=s2>&#34;google_mx_record_1&#34;</span>
+</span></span><span class=line><span class=cl><span class=n>    &#34;name&#34;</span> <span class=o>=</span> <span class=s2>&#34;mydomain.com&#34;</span>
+</span></span><span class=line><span class=cl><span class=n>    &#34;priority&#34;</span> <span class=o>=</span> <span class=m>5</span>
+</span></span><span class=line><span class=cl><span class=n>    &#34;proxied&#34;</span> <span class=o>=</span> <span class=k>null</span>
+</span></span><span class=line><span class=cl><span class=n>    &#34;ttl&#34;</span> <span class=o>=</span> <span class=k>null</span>
+</span></span><span class=line><span class=cl><span class=n>    &#34;type&#34;</span> <span class=o>=</span> <span class=s2>&#34;CNAME&#34;</span>
+</span></span><span class=line><span class=cl><span class=n>    &#34;value&#34;</span> <span class=o>=</span> <span class=s2>&#34;alt1.aspmx.l.google.com&#34;</span>
+</span></span><span class=line><span class=cl><span class=n>    &#34;zone_name&#34;</span> <span class=o>=</span> <span class=s2>&#34;mydomain.com&#34;</span>
+</span></span><span class=line><span class=cl>  }
+</span></span></code></pre></td></tr></table></div></div><h3 id=14-creating-the-resources>1.4 Creating the resources</h3><p>We can create zones like so without using the flattened records:</p><p>main.tf:</p><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt>1
+</span><span class=lnt>2
+</span><span class=lnt>3
+</span><span class=lnt>4
+</span><span class=lnt>5
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-hcl data-lang=hcl><span class=line><span class=cl><span class=k>resource</span> <span class=s2>&#34;cloudflare_zone&#34; &#34;this&#34;</span> {
+</span></span><span class=line><span class=cl><span class=n>  for_each</span> <span class=o>=</span> <span class=k>local</span><span class=p>.</span><span class=k>cloudflare_records</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl><span class=n>  zone</span> <span class=o>=</span> <span class=k>each</span><span class=p>.</span><span class=k>value</span><span class=p>.</span><span class=k>name</span>
+</span></span><span class=line><span class=cl>}
+</span></span></code></pre></td></tr></table></div></div><p>Next, iterate through the records, setting the key/resource name as we like and appending the <code>friendly_name</code> to ensure uniquness.</p><p>main.tf:</p><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt> 1
+</span><span class=lnt> 2
+</span><span class=lnt> 3
+</span><span class=lnt> 4
+</span><span class=lnt> 5
+</span><span class=lnt> 6
+</span><span class=lnt> 7
+</span><span class=lnt> 8
+</span><span class=lnt> 9
+</span><span class=lnt>10
+</span><span class=lnt>11
+</span><span class=lnt>12
+</span><span class=lnt>13
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-hcl data-lang=hcl><span class=line><span class=cl>
+</span></span><span class=line><span class=cl><span class=k>resource</span> <span class=s2>&#34;cloudflare_record&#34; &#34;this&#34;</span> {
+</span></span><span class=line><span class=cl><span class=n>  for_each</span> <span class=o>=</span> { <span class=k>for</span> <span class=k>record</span> <span class=k>in</span> <span class=k>local</span><span class=p>.</span><span class=k>flattened_records</span> <span class=err>:</span> <span class=k>join</span><span class=p>(</span><span class=s2>&#34;_&#34;</span><span class=p>,</span>
+</span></span><span class=line><span class=cl><span class=n>  [record.zone_name, record.type, record.friendly_name])</span> <span class=o>=</span><span class=err>&gt;</span> <span class=k>record</span> }
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl><span class=n>  zone_id</span>  <span class=o>=</span> <span class=k>cloudflare_zone</span><span class=p>.</span><span class=k>this</span><span class=p>[</span><span class=k>each</span><span class=p>.</span><span class=k>value</span><span class=p>.</span><span class=k>zone_name</span><span class=p>].</span><span class=k>id</span>
+</span></span><span class=line><span class=cl><span class=n>  name</span>     <span class=o>=</span> <span class=k>each</span><span class=p>.</span><span class=k>value</span><span class=p>.</span><span class=k>name</span>
+</span></span><span class=line><span class=cl><span class=n>  value</span>    <span class=o>=</span> <span class=k>each</span><span class=p>.</span><span class=k>value</span><span class=p>.</span><span class=k>value</span>
+</span></span><span class=line><span class=cl><span class=n>  type</span>     <span class=o>=</span> <span class=k>each</span><span class=p>.</span><span class=k>value</span><span class=p>.</span><span class=k>type</span>
+</span></span><span class=line><span class=cl><span class=n>  ttl</span>      <span class=o>=</span> <span class=k>each</span><span class=p>.</span><span class=k>value</span><span class=p>.</span><span class=k>ttl</span>
+</span></span><span class=line><span class=cl><span class=n>  proxied</span>  <span class=o>=</span> <span class=k>each</span><span class=p>.</span><span class=k>value</span><span class=p>.</span><span class=k>proxied</span>
+</span></span><span class=line><span class=cl><span class=n>  priority</span> <span class=o>=</span> <span class=k>each</span><span class=p>.</span><span class=k>value</span><span class=p>.</span><span class=k>priority</span>
+</span></span><span class=line><span class=cl>}
+</span></span></code></pre></td></tr></table></div></div><p>And the end-result &ndash; using only 2 resource blocks to create as many records and zones as we need, without worrying about the number of domains, type of records, or overlapping resource names:</p><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt>1
+</span><span class=lnt>2
+</span><span class=lnt>3
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-hcl data-lang=hcl><span class=line><span class=cl><span class=k>cloudflare_zone</span><span class=p>.</span><span class=k>this</span><span class=p>[</span><span class=s2>&#34;mydomain.com&#34;</span><span class=p>]</span>
+</span></span><span class=line><span class=cl><span class=k>cloudflare_record</span><span class=p>.</span><span class=k>this</span><span class=p>[</span><span class=s2>&#34;mydomain.com_CNAME_examplecname&#34;</span><span class=p>]</span>
+</span></span><span class=line><span class=cl><span class=k>cloudflare_record</span><span class=p>.</span><span class=k>this</span><span class=p>[</span><span class=s2>&#34;mydomain.com_MX_google_mx_record_1&#34;</span><span class=p>]</span>
+</span></span></code></pre></td></tr></table></div></div></p></article></div></div></div></div></div></div></div></body></html>

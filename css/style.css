@@ -11,6 +11,37 @@ a:hover {
     color: #fff !important;
 }
 
+h1,
+h2,
+h3,
+h4,
+h5 {
+    color: #2bc258 !important;
+    margin-top: 1rem;
+    font-family: monospace;
+}
+
+h1 {
+    font-size: 2rem;
+}
+
+h2 {
+    font-size: 1.5rem;
+
+}
+
+h3 {
+    font-size: 1rem;
+}
+
+h4 {
+    font-size: 0.5rem;
+}
+
+h5 {
+    font-size: 0.1rem;
+}
+
 .notification {
     background: #141519 !important;
     color: #ffa11d !important;
@@ -53,10 +84,6 @@ a:hover {
 .is-content {
     background-color: #141519;
     box-shadow: none;
-}
-
-.is-content a:link {
-    color: #2bc258 !important;
 }
 
 .is-content a:hover {
@@ -103,11 +130,9 @@ li {
     color: #fff !important;
 }
 
-
 .is-content .is-post-content ul li:first-of-type {
     margin-top: 0.4rem !important;
 }
-
 
 .is-content li {
     list-style-type: square !important;
@@ -122,6 +147,11 @@ li {
 .is-content ul li a:hover {
     color: #71ff9b !important;
     font-weight: bold;
+}
+
+hr {
+    visibility: hidden;
+    margin: 0.5rem;
 }
 
 code {
