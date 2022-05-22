@@ -1,0 +1,21 @@
+{{ define "main" }}
+</div>
+
+<div class="tile is-parent is-8">
+
+    <article class="tile is-child is-content box">
+        <a href="/">
+            ../ </a>
+        <p class="title">{{ .Title }}</p>
+        <p class="subtitle">{{ .PublishDate.Format "January 2, 2006" }}</p>
+        {{range .Site.RegularPages }}
+        <p class="d">{{ .Content }}</p>
+        {{end}}
+    </article>
+</div>
+</div>
+</div>
+</div>
+</div>
+
+{{ end }}
