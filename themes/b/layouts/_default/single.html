@@ -8,10 +8,8 @@
             ../ </a>
         <p class="title">{{ .Title }}</p>
         <p class="subtitle">{{ .PublishDate.Format "January 2, 2006" }}</p>
-        {{range .Site.RegularPages }}
         <div class="is-post-content">
             <p>{{ .Content }}</p>
-            {{end}}
     </article>
 </div>
 </div>
