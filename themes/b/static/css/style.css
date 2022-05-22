@@ -55,6 +55,14 @@ a:hover {
     box-shadow: none;
 }
 
+.is-content a:link {
+    color: #2bc258 !important;
+}
+
+.is-content a:hover {
+    color: #ffffff !important;
+}
+
 .is-content p {
     color: #fff !important;
 }
@@ -77,7 +85,50 @@ a:hover {
     font-weight: bold;
 }
 
+.is-content .is-post-content p,
+ul,
+li {
+    color: #5f6168 !important;
+}
+
+.is-content .is-post-content p {
+    margin-top: 1rem;
+}
+
+.is-content .is-post-content a:link {
+    color: #2bc258 !important;
+}
+
+.is-content .is-post-content a:hover {
+    color: #fff !important;
+}
+
+
+.is-content .is-post-content ul li:first-of-type {
+    margin-top: 0.4rem !important;
+}
+
+
+.is-content li {
+    list-style-type: square !important;
+    margin-left: 1rem;
+}
+
+.is-content li li {
+    color: #4a4c51 !important;
+    margin-left: 1rem;
+}
+
 .is-content ul li a:hover {
     color: #71ff9b !important;
     font-weight: bold;
+}
+
+code {
+    background-color: #191a1e;
+    color: #2bc258
+}
+
+code:hover {
+    color: #fff;
 }

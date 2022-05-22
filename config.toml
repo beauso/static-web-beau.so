@@ -3,3 +3,13 @@ languageCode = 'en-us'
 title = '/'
 theme = "b"
 sectionPagesMenu = "main"
+[params]
+  author = "beau"
+  
+[markup.highlight]
+      codeFences = true
+      guessSyntax = true
+      lineNos = true
+      lineNumbersInTable = true
+      tabWidth = 2
+      noClasses = false
